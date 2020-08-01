@@ -55,17 +55,7 @@ class LaneFinder():
         return undist
 # * Use color transforms, gradients, etc., to create a thresholded binary image.
     def generate_binary_image(self, img, s_thresh=(170,255), sx_thresh=(20,100)):
-        img = np.copy(img)
-        r = img[:,:,0]
-        hls = cv2.cvtColor(img, cv2.COLOR_RGB2HLS)
-        lchannel = hls[:,:,1]
-        schannel = hls[:,:,2]
-        sobelx = cv2.Sobel(r, cv2.CV_64F, 1, 0)
-        abs_sobelx = np.absolute(sobelx)
-        scaled_soble = np.uint8(255*abs_sobelx/np.max(abs_sobelx))
-
-        
-        return
+       
 # * Apply a perspective transform to rectify binary image ("birds-eye view").
     def rectify_binary_image(self):
         return
@@ -86,8 +76,8 @@ def run_pipeline(lane_finder, img):
     mtx, dist = lane_finder.camera_calibration()
     undist_img = lane_finder.distortion_correction(img, mtx, dist)
     cv2.imwrite('01-undistorted_image.jpg', undist_img)
-
-    cv2.imshow('img', undist_img)
+    binary_img = lane_finder.generate_binary_image(undist_img)
+    cv2.imshow('img', binary_img)
     cv2.waitKey(0)
     return
 
