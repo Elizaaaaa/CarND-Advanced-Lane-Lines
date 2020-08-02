@@ -54,7 +54,34 @@ class LaneFinder():
         undist = cv2.undistort(img, mtx, dist, None, mtx)
         return undist
 # * Use color transforms, gradients, etc., to create a thresholded binary image.
-    def generate_binary_image(self, img, s_thresh=(170,255), sx_thresh=(20,100)):
+    def generate_binary_image(self, img, sobel_kenel=3, sob_thresh=(20, 100), mag_thresh=(30, 100), dir_thresh=(0.7, 1.3)):
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=sobel_kenel)
+        sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=sobel_kenel)
+        # Calculate x y gradient
+        absx = np.absolute(sobelx)
+        absy = np.absolute(sobely)
+        scaledx = np.uint8(255*absx/np.max(absx))
+        scaledy = np.uint8(255*absy/np.max(absy))
+        gradx = np.zeros_like(scaledx)
+        grady = np.zeros_like(scaledy)
+        gradx[(sob_thresh[0]<=scaledx)&(scaledx<=sob_thresh[1])] = 1
+        grady[(sob_thresh[0]<=scaledy)&(scaledy<=sob_thresh[1])] = 1
+        # Calculate magnitutude
+        mag = np.sqrt(sobelx**2 + sobely**2)
+        scaled_mag = np.max(mag) / 255
+        scaled_sobel = (mag/scaled_mag).astype(np.uint8) 
+        mag_binary = np.zeros_like(scaled_sobel)
+        mag_binary[(mag_thresh[0]<=scaled_sobel)&(scaled_sobel<=mag_thresh[1])] = 1
+        # Calculate dir gradient
+        absdir = np.arctan2(absy, absx)
+        dir_binary = np.zeros_like(absdir)
+        dir_binary[(dir_thresh[0]<=absdir)&(absdir<=dir_thresh[1])] = 1
+        # Combine together
+        combined = np.zeros_like(dir_binary)
+        combined[((gradx == 1) & (grady == 1)) | ((mag_binary == 1) & (dir_binary == 1))] = 1
+
+        return combined
        
 # * Apply a perspective transform to rectify binary image ("birds-eye view").
     def rectify_binary_image(self):
@@ -75,10 +102,15 @@ class LaneFinder():
 def run_pipeline(lane_finder, img):
     mtx, dist = lane_finder.camera_calibration()
     undist_img = lane_finder.distortion_correction(img, mtx, dist)
-    cv2.imwrite('01-undistorted_image.jpg', undist_img)
+    gray = cv2.cvtColor(undist_img, cv2.COLOR_BGR2GRAY)
+    sobelx = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
+    absx = np.absolute(sobelx)
+    scaledx = np.uint8(255*absx/np.max(absx))
+    gradx = np.zeros_like(scaledx)
+    gradx[(20<=scaledx)&(scaledx<=100)] = 1
     binary_img = lane_finder.generate_binary_image(undist_img)
-    cv2.imshow('img', binary_img)
-    cv2.waitKey(0)
+    plt.imshow(binary_img, cmap='gray')
+    plt.show()
     return
 
 
@@ -89,6 +121,4 @@ if __name__ == '__main__':
 
     testimg = cv2.imread('./test_images/test1.jpg')
     run_pipeline(lane_finder, testimg)
-
-    # Step through the list and search for chessboard corners
     
