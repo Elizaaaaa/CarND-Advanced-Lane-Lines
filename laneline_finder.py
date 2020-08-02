@@ -32,6 +32,10 @@ class LaneFinder():
         self.mtx = None
         self.dist = None
         self.M = None
+        self.calibrated = False
+        self.left_fit = None
+        self.right_fit = None
+        self.has_first_fit = False
 # * Compute the camera calibration matrix and distortion coefficients given a set of chessboard images.
     def camera_calibration(self, nx=9, ny=6):
         objp = np.zeros((ny*nx,3), np.float32)
@@ -91,7 +95,7 @@ class LaneFinder():
 # * Apply a perspective transform to rectify binary image ("birds-eye view").
     def rectify_binary_image(self, img):
         img_size = (img.shape[1], img.shape[0])
-        if self.M:
+        if self.calibrated:
             # Has the calculated M, warp directly
             return cv2.warpPerspective(img, self.M, img_size, flags=cv2.INTER_LINEAR)
             
@@ -108,20 +112,33 @@ class LaneFinder():
                         [(img_size[0] * 3 / 4), 0]])
         M = cv2.getPerspectiveTransform(src, dst)
         self.M = M
+        self.calibrated = True
         warped_img = cv2.warpPerspective(img, M, img_size, flags=cv2.INTER_LINEAR)
         return warped_img
 
     def find_lane_pixels(self, img, nwindows=9, margin=80, minpix=50, visualize=True):
-        histogram = np.sum(img[img.shape[0]//2:,:], axis=0)
         out_img = np.dstack([img, img, img])
-        midpoint = np.int(histogram.shape[0] // 2)
-        left_base = np.argmax(histogram[:midpoint])
-        right_base = np.argmax(histogram[midpoint:]) + midpoint
 
-        window_height = np.int(img.shape[0]//nwindows)
         nonzero = img.nonzero()
         nonzeroy = np.array(nonzero[0])
         nonzerox = np.array(nonzero[1])
+        if self.has_first_fit:
+            left_fitx = self.left_fit[0]*nonzeroy**2+self.left_fit[1]*nonzeroy+self.left_fit[2]
+            right_fitx = self.right_fit[0]*nonzeroy**2+self.right_fit[1]*nonzeroy+self.right_fit[2]
+            left_lane_inds = (left_fitx-margin <= nonzerox) & (nonzerox <= left_fitx+margin)
+            right_lane_inds = (left_fitx-margin <= nonzerox) & (nonzerox <= left_fitx+margin)
+            leftx = nonzerox[left_lane_inds]
+            lefty = nonzeroy[left_lane_inds]
+            rightx = nonzerox[right_lane_inds]
+            righty = nonzeroy[right_lane_inds]
+
+            return leftx, lefty, rightx, righty, out_img
+
+        histogram = np.sum(img[img.shape[0]//2:,:], axis=0)
+        midpoint = np.int(histogram.shape[0] // 2)
+        left_base = np.argmax(histogram[:midpoint])
+        right_base = np.argmax(histogram[midpoint:]) + midpoint
+        window_height = np.int(img.shape[0]//nwindows)
 
         leftx_current = left_base
         rightx_current = right_base
@@ -160,12 +177,17 @@ class LaneFinder():
         rightx = nonzerox[right_lane_inds]
         righty = nonzeroy[right_lane_inds]
 
+        self.has_first_fit = True
+
         return leftx, lefty, rightx, righty, out_img
     
     def fit_polynomial(self, img, visualize=True):
         leftx, lefty, rightx, righty, out_img = self.find_lane_pixels(img)
-        left_fit = np.polyfit(lefty, leftx, 2)
-        right_fit = np.polyfit(righty, rightx, 2)
+        self.left_fit = np.polyfit(lefty, leftx, 2)
+        self.right_fit = np.polyfit(righty, rightx, 2)
+        left_fit = self.left_fit
+        right_fit =  self.right_fit
+
         ploty = np.linspace(0, img.shape[0]-1, img.shape[0])
 
         try:
@@ -202,8 +224,8 @@ def run_pipeline(lane_finder, img):
     binary_img = lane_finder.generate_binary_image(undist_img)
     warped_img = lane_finder.rectify_binary_image(binary_img)
     lane_finder.fit_polynomial(warped_img)
-    plt.imshow(warped_img, cmap='gray')
-    plt.show()
+    #plt.imshow(warped_img, cmap='gray')
+    #plt.show()
     return
 
 
@@ -214,4 +236,5 @@ if __name__ == '__main__':
 
     testimg = cv2.imread('./test_images/test1.jpg')
     run_pipeline(lane_finder, testimg)
-    
+    testimg = cv2.imread('./test_images/test2.jpg')
+    run_pipeline(lane_finder, testimg)
