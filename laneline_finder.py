@@ -60,6 +60,8 @@ class LaneFinder():
         self.dist = dist
 # * Apply a distortion correction to raw images.
     def distortion_correction(self, img):
+        if not self.calibrated:
+            self.camera_calibration()
         undist = cv2.undistort(img, self.mtx, self.dist, None, self.mtx)
         return undist
 # * Use color transforms, gradients, etc., to create a thresholded binary image.
@@ -219,22 +221,36 @@ class LaneFinder():
         return
     
 def run_pipeline(lane_finder, img):
-    lane_finder.camera_calibration()
     undist_img = lane_finder.distortion_correction(img)
     binary_img = lane_finder.generate_binary_image(undist_img)
     warped_img = lane_finder.rectify_binary_image(binary_img)
     lane_finder.fit_polynomial(warped_img)
-    #plt.imshow(warped_img, cmap='gray')
+    #plt.imshow(undist_img, cmap='gray')
     #plt.show()
     return
 
-
+def save_test_imgs():
+    # Opens the Video file
+    cap= cv2.VideoCapture('project_video.mp4')
+    i=0
+    while(cap.isOpened()):
+        ret, frame = cap.read()
+        if ret == False:
+            break
+        cv2.imwrite('test_images/project_video/'+str(i)+'.jpg',frame)
+        i+=1
+ 
+    cap.release()
+    cv2.destroyAllWindows()
 
 if __name__ == '__main__':
     print("Executing: Lane Line Finder.")
+    
     lane_finder = LaneFinder()
 
-    testimg = cv2.imread('./test_images/test1.jpg')
+    testimg = cv2.imread('./test_images/project_video/0.jpg')
     run_pipeline(lane_finder, testimg)
-    testimg = cv2.imread('./test_images/test2.jpg')
+    testimg = cv2.imread('./test_images/project_video/10.jpg')
+    run_pipeline(lane_finder, testimg)
+    testimg = cv2.imread('./test_images/project_video/20.jpg')
     run_pipeline(lane_finder, testimg)
