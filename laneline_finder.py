@@ -246,8 +246,11 @@ class LaneFinder():
         self.right_curverad = (1+(2*right_fit[0]*y_eval+right_fit[1])**2)**(3/2) / np.absolute(2*right_fit[0])
         return
 # * Warp the detected lane boundaries back onto the original image.
-    def map_to_real_world(self):
+    def map_to_real_world(self, laned_image=None):
         self.calculate_curvature(ym=self.ym_per_pix)
+        if laned_image.any():
+            laned_mapped = cv2.warpPerspective(laned_image, self.Minv, (laned_image.shape[1], laned_image.shape[0]))
+            return laned_mapped
         return
 # * Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
     def draw_outputs(self):
@@ -270,16 +273,17 @@ def run_pipeline(lane_finder, img):
     binary_img = lane_finder.generate_binary_image(undist_img)
     warped_img = lane_finder.rectify_binary_image(binary_img)
     laned_image, left_fitx, right_fitx, ploty = lane_finder.fit_polynomial(warped_img, lane_finder.xm_per_pix, lane_finder.ym_per_pix)
-   # lane_finder.calculate_curvature()
-    lane_finder.map_to_real_world()
+    laned_mapped = lane_finder.map_to_real_world(laned_image)
 
     # Visualization
     curv_info =  "Left curverad: {}, Right curverad: {}".format(lane_finder.left_curverad, lane_finder.right_curverad)
     f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(10, 10))
     f.tight_layout()
-    ax1.imshow(img)
-    ax2.imshow(binary_img)
-    ax3.imshow(warped_img)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    result = cv2.addWeighted(img, 1, laned_mapped, 0.6, 0, dtype=cv2.CV_8U)
+    ax1.imshow(laned_mapped)
+    ax2.imshow(img)
+    ax3.imshow(result)
     ax4.imshow(laned_image)
     ax4.plot(left_fitx, ploty, color='yellow')
     ax4.plot(right_fitx, ploty, color='yellow')
