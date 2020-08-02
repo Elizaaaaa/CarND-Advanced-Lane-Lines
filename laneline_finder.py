@@ -201,11 +201,8 @@ class LaneFinder():
         if visualize:
             out_img[lefty, leftx] = [255,0,0]
             out_img[righty, rightx] = [0,0,255]
-            plt.figure()
-            plt.plot(left_fitx, ploty, color='yellow')
-            plt.plot(right_fitx, ploty, color='yellow')
-            plt.imshow(out_img)
-            plt.show()
+        
+        return out_img, left_fitx, right_fitx, ploty
 
 # * Detect lane pixels and fit to find the lane boundary.
     def detect_lane_boundary(self):
@@ -224,9 +221,16 @@ def run_pipeline(lane_finder, img):
     undist_img = lane_finder.distortion_correction(img)
     binary_img = lane_finder.generate_binary_image(undist_img)
     warped_img = lane_finder.rectify_binary_image(binary_img)
-    lane_finder.fit_polynomial(warped_img)
-    #plt.imshow(undist_img, cmap='gray')
-    #plt.show()
+    laned_image, left_fitx, right_fitx, ploty = lane_finder.fit_polynomial(warped_img)
+    f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(10, 10))
+    f.tight_layout()
+    ax1.imshow(img)
+    ax2.imshow(binary_img)
+    ax3.imshow(warped_img)
+    ax4.imshow(laned_image)
+    ax4.plot(left_fitx, ploty, color='yellow')
+    ax4.plot(right_fitx, ploty, color='yellow')
+    plt.show()
     return
 
 def save_test_imgs():
