@@ -33,11 +33,14 @@ class LaneFinder():
         self.mtx = None
         self.dist = None
         self.M = None
+        self.Minv = None
         self.calibrated = False
         # Polynomial
         self.left_fit = None
         self.right_fit = None
         self.ploty = None
+        self.left_fit_x = None
+        self.right_fit_x = None
         self.has_first_fit = False
         # Curvature
         self.left_curverad = None
@@ -46,6 +49,11 @@ class LaneFinder():
         self.xm_per_pix = 3.7/700
         self.left_fit_maped = None
         self.right_fit_maped = None
+        # Car value
+        self.offset = None
+        # Lane
+        self.left_lane = Line()
+        self.right_lane = Line()
 
 # * Compute the camera calibration matrix and distortion coefficients given a set of chessboard images.
     def camera_calibration(self, nx=9, ny=6):
@@ -125,6 +133,7 @@ class LaneFinder():
                         [(img_size[0] * 3 / 4), 0]])
         M = cv2.getPerspectiveTransform(src, dst)
         self.M = M
+        self.Minv = cv2.getPerspectiveTransform(dst, src)
         self.calibrated = True
         warped_img = cv2.warpPerspective(img, M, img_size, flags=cv2.INTER_LINEAR)
         return warped_img
@@ -210,12 +219,19 @@ class LaneFinder():
         try:
             left_fitx = left_fit[0]*ploty**2+left_fit[1]*ploty+left_fit[2]
             right_fitx = right_fit[0]*ploty**2+right_fit[1]*ploty+right_fit[2]
+            self.left_fit_x = left_fitx
+            self.right_fit_x = right_fitx
         except TypeError:
             print('fit_polynomial: failed to fit a line!')
 
         if visualize:
-            out_img[lefty, leftx] = [255,0,0]
-            out_img[righty, rightx] = [0,0,255]
+            #out_img[lefty, leftx] = [255,0,0]
+            #out_img[righty, rightx] = [0,0,255]
+            pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
+            pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
+            pts = np.hstack((pts_left, pts_right))
+            cv2.fillPoly(out_img, np.int_(pts), (0, 255, 255))
+
             return out_img, left_fitx, right_fitx, ploty
         
         return out_img
@@ -236,6 +252,18 @@ class LaneFinder():
 # * Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
     def draw_outputs(self):
         return
+
+    def update_lane_values(self):
+        left_lane = self.left_lane
+        left_lane.recent_xfitted.append(self.left_fit_x)
+        left_lane.bestx = np.average(left_lane.recent_xfitted)
+        left_lane.current_fit = self.left_fit
+       # left_lane.best_fit = 
+        left_lane.radius_of_curvature = self.left_curverad
+
+        right_lane = self.right_lane
+        right_lane.recent_xfitted.append(self.right_fit_x)
+
     
 def run_pipeline(lane_finder, img):
     undist_img = lane_finder.distortion_correction(img)
@@ -280,7 +308,7 @@ if __name__ == '__main__':
 
     testimg = cv2.imread('./test_images/project_video/0.jpg')
     run_pipeline(lane_finder, testimg)
-    testimg = cv2.imread('./test_images/project_video/10.jpg')
-    run_pipeline(lane_finder, testimg)
-    testimg = cv2.imread('./test_images/project_video/20.jpg')
-    run_pipeline(lane_finder, testimg)
+    # testimg = cv2.imread('./test_images/project_video/10.jpg')
+    # run_pipeline(lane_finder, testimg)
+    # testimg = cv2.imread('./test_images/project_video/20.jpg')
+    # run_pipeline(lane_finder, testimg)
