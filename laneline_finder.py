@@ -42,6 +42,11 @@ class LaneFinder():
         # Curvature
         self.left_curverad = None
         self.right_curverad = None
+        self.ym_per_pix = 30/720 
+        self.xm_per_pix = 3.7/700
+        self.left_fit_maped = None
+        self.right_fit_maped = None
+
 # * Compute the camera calibration matrix and distortion coefficients given a set of chessboard images.
     def camera_calibration(self, nx=9, ny=6):
         objp = np.zeros((ny*nx,3), np.float32)
@@ -189,8 +194,11 @@ class LaneFinder():
 
         return leftx, lefty, rightx, righty, out_img
 # * Detect lane pixels and fit to find the lane boundary.
-    def fit_polynomial(self, img, visualize=True):
+    def fit_polynomial(self, img, xm=1, ym=1, visualize=True):
         leftx, lefty, rightx, righty, out_img = self.find_lane_pixels(img)
+
+        self.left_fit_maped = np.polyfit(lefty * ym, leftx * xm, 2)
+        self.right_fit_maped = np.polyfit(righty * ym, rightx * xm, 2)
         self.left_fit = np.polyfit(lefty, leftx, 2)
         self.right_fit = np.polyfit(righty, rightx, 2)
         left_fit = self.left_fit
@@ -212,13 +220,18 @@ class LaneFinder():
         
         return out_img
 # * Determine the curvature of the lane and vehicle position with respect to center.
-    def calculate_curvature(self):
-        y_eval = np.max(self.ploty)
-        self.left_curverad = (1+(2*self.left_fit[0]*y_eval+self.left_fit[1])**2)**(3/2) / np.absolute(2*self.left_fit[0])
-        self.right_curverad = (1+(2*self.right_fit[0]*y_eval+self.right_fit[1])**2)**(3/2) / np.absolute(2*self.right_fit[0])
+    def calculate_curvature(self, ym=1):
+        y_eval = np.max(self.ploty) * ym
+
+        left_fit = self.left_fit if ym==1 else self.left_fit_maped
+        right_fit = self.right_fit if ym==1 else self.right_fit_maped
+
+        self.left_curverad = (1+(2*left_fit[0]*y_eval+left_fit[1])**2)**(3/2) / np.absolute(2*left_fit[0])
+        self.right_curverad = (1+(2*right_fit[0]*y_eval+right_fit[1])**2)**(3/2) / np.absolute(2*right_fit[0])
         return
 # * Warp the detected lane boundaries back onto the original image.
-    def mat_to_real_world(self):
+    def map_to_real_world(self):
+        self.calculate_curvature(ym=self.ym_per_pix)
         return
 # * Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
     def draw_outputs(self):
@@ -228,8 +241,9 @@ def run_pipeline(lane_finder, img):
     undist_img = lane_finder.distortion_correction(img)
     binary_img = lane_finder.generate_binary_image(undist_img)
     warped_img = lane_finder.rectify_binary_image(binary_img)
-    laned_image, left_fitx, right_fitx, ploty = lane_finder.fit_polynomial(warped_img)
-    lane_finder.calculate_curvature()
+    laned_image, left_fitx, right_fitx, ploty = lane_finder.fit_polynomial(warped_img, lane_finder.xm_per_pix, lane_finder.ym_per_pix)
+   # lane_finder.calculate_curvature()
+    lane_finder.map_to_real_world()
 
     # Visualization
     curv_info =  "Left curverad: {}, Right curverad: {}".format(lane_finder.left_curverad, lane_finder.right_curverad)
