@@ -55,7 +55,7 @@ class LaneFinder():
         self.mtx = mtx
         self.dist = dist
 # * Apply a distortion correction to raw images.
-    def distortion_correction(self, img, mtx, dist):
+    def distortion_correction(self, img):
         undist = cv2.undistort(img, self.mtx, self.dist, None, self.mtx)
         return undist
 # * Use color transforms, gradients, etc., to create a thresholded binary image.
@@ -89,7 +89,7 @@ class LaneFinder():
         return combined
        
 # * Apply a perspective transform to rectify binary image ("birds-eye view").
-    def rectify_binary_image(self, img, M=None):
+    def rectify_binary_image(self, img):
         img_size = (img.shape[1], img.shape[0])
         if self.M:
             # Has the calculated M, warp directly
