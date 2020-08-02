@@ -128,7 +128,7 @@ class LaneFinder():
             left_fitx = self.left_fit[0]*nonzeroy**2+self.left_fit[1]*nonzeroy+self.left_fit[2]
             right_fitx = self.right_fit[0]*nonzeroy**2+self.right_fit[1]*nonzeroy+self.right_fit[2]
             left_lane_inds = (left_fitx-margin <= nonzerox) & (nonzerox <= left_fitx+margin)
-            right_lane_inds = (left_fitx-margin <= nonzerox) & (nonzerox <= left_fitx+margin)
+            right_lane_inds = (right_fitx-margin <= nonzerox) & (nonzerox <= right_fitx+margin)
             leftx = nonzerox[left_lane_inds]
             lefty = nonzeroy[left_lane_inds]
             rightx = nonzerox[right_lane_inds]
