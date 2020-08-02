@@ -29,9 +29,9 @@ class Line():
 
 class LaneFinder():
 # * Compute the camera calibration matrix and distortion coefficients given a set of chessboard images.
-    def camera_calibration(self):
-        objp = np.zeros((6*9,3), np.float32)
-        objp[:,:2] = np.mgrid[0:9,0:6].T.reshape(-1,2)
+    def camera_calibration(self, nx=9, ny=6):
+        objp = np.zeros((ny*nx,3), np.float32)
+        objp[:,:2] = np.mgrid[0:nx,0:ny].T.reshape(-1,2)
         objpoints = []
         imgpoints = []
         images = glob.glob('./camera_cal/calibration*.jpg')
@@ -40,7 +40,7 @@ class LaneFinder():
             gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 
             # Find the chessboard corners
-            ret, corners = cv2.findChessboardCorners(gray, (9,6),None)
+            ret, corners = cv2.findChessboardCorners(gray, (nx,ny),None)
 
             # If found, add object points, image points
             if ret == True:
@@ -84,8 +84,26 @@ class LaneFinder():
         return combined
        
 # * Apply a perspective transform to rectify binary image ("birds-eye view").
-    def rectify_binary_image(self):
-        return
+    def rectify_binary_image(self, img, M=None):
+        img_size = (img.shape[1], img.shape[0])
+        if M:
+            # Has the calculated M, warp directly
+            return cv2.warpPerspective(img, M, img_size, flags=cv2.INTER_LINEAR)
+            
+        # Get the perspective transformation
+        src = np.float32(
+                        [[(img_size[0] / 2) - 63, img_size[1] / 2 + 100],
+                        [((img_size[0] / 6) - 20), img_size[1]],
+                        [(img_size[0] * 5 / 6) + 60, img_size[1]],
+                        [(img_size[0] / 2 + 65), img_size[1] / 2 + 100]])
+        dst = np.float32(
+                        [[(img_size[0] / 4), 0],
+                        [(img_size[0] / 4), img_size[1]],
+                        [(img_size[0] * 3 / 4), img_size[1]],
+                        [(img_size[0] * 3 / 4), 0]])
+        M = cv2.getPerspectiveTransform(src, dst)
+        warped_img = cv2.warpPerspective(img, M, img_size, flags=cv2.INTER_LINEAR)
+        return warped_img, M
 # * Detect lane pixels and fit to find the lane boundary.
     def detect_lane_boundary(self):
         return
@@ -102,14 +120,9 @@ class LaneFinder():
 def run_pipeline(lane_finder, img):
     mtx, dist = lane_finder.camera_calibration()
     undist_img = lane_finder.distortion_correction(img, mtx, dist)
-    gray = cv2.cvtColor(undist_img, cv2.COLOR_BGR2GRAY)
-    sobelx = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
-    absx = np.absolute(sobelx)
-    scaledx = np.uint8(255*absx/np.max(absx))
-    gradx = np.zeros_like(scaledx)
-    gradx[(20<=scaledx)&(scaledx<=100)] = 1
     binary_img = lane_finder.generate_binary_image(undist_img)
-    plt.imshow(binary_img, cmap='gray')
+    warped_img, M = lane_finder.rectify_binary_image(binary_img)
+    plt.imshow(warped_img, cmap='gray')
     plt.show()
     return
 
