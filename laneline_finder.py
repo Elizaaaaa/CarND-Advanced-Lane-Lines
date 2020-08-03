@@ -258,13 +258,16 @@ class LaneFinder():
             laned_mapped = cv2.warpPerspective(laned_image, self.Minv, (laned_image.shape[1], laned_image.shape[0]))
             return laned_mapped
         return
-# * Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
-    def draw_outputs(self):
+    def sanity_check(self):
         return
 
     def update_line_values(self):
         self.left_line.recent_xfitted.append(self.left_fit_x)
         self.left_line.bestx = np.average(self.left_line.recent_xfitted)
+        self.right_line.recent_xfitted.append(self.right_fit_x)
+        self.right_line.bestx = np.average(self.right_line.recent_xfitted)
+
+        self.sanity_check()
 
     def pipeline(self, img):
         undist_img = self.distortion_correction(img)
@@ -330,7 +333,7 @@ def process_video(filename):
 if __name__ == '__main__':
     print("Executing: Lane Line Finder.")
     
-    process_video('project_video.mp4')
+    process_video('challenge_video.mp4')
     #testimg = cv2.imread('./test_images/project_video/0.jpg')
     #result = lane_finder.pipeline(testimg)
     #plt.imshow(result)
