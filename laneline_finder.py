@@ -2,6 +2,7 @@ import numpy as np
 import cv2
 import glob
 import matplotlib.pyplot as plt
+from moviepy.editor import VideoFileClip
 
 # Define a class to receive the characteristics of each line detection
 class Line():
@@ -52,8 +53,8 @@ class LaneFinder():
         # Car value
         self.offset = None
         # Lane
-        self.left_lane = Line()
-        self.right_lane = Line()
+        self.left_line = Line()
+        self.right_line = Line()
 
 # * Compute the camera calibration matrix and distortion coefficients given a set of chessboard images.
     def camera_calibration(self, nx=9, ny=6):
@@ -107,9 +108,14 @@ class LaneFinder():
         absdir = np.arctan2(absy, absx)
         dir_binary = np.zeros_like(absdir)
         dir_binary[(dir_thresh[0]<=absdir)&(absdir<=dir_thresh[1])] = 1
+        # HLS filter
+        hls = cv2.cvtColor(img, cv2.COLOR_RGB2HLS)
+        schannel = hls[:,:,2]
+        s_binary = np.zeros_like(schannel)
+        s_binary[(100<=schannel)&(schannel<=200)] = 1
         # Combine together
         combined = np.zeros_like(dir_binary)
-        combined[((gradx == 1) & (grady == 1)) | ((mag_binary == 1) & (dir_binary == 1))] = 1
+        combined[((gradx == 1) & (grady == 1)) | ((mag_binary == 1) & (dir_binary == 1)) | s_binary == 1] = 1
 
         return combined
        
@@ -256,16 +262,20 @@ class LaneFinder():
     def draw_outputs(self):
         return
 
-    def update_lane_values(self):
-        left_lane = self.left_lane
-        left_lane.recent_xfitted.append(self.left_fit_x)
-        left_lane.bestx = np.average(left_lane.recent_xfitted)
-        left_lane.current_fit = self.left_fit
-       # left_lane.best_fit = 
-        left_lane.radius_of_curvature = self.left_curverad
+    def update_line_values(self):
+        self.left_line.recent_xfitted.append(self.left_fit_x)
+        self.left_line.bestx = np.average(self.left_line.recent_xfitted)
 
-        right_lane = self.right_lane
-        right_lane.recent_xfitted.append(self.right_fit_x)
+    def pipeline(self, img):
+        undist_img = self.distortion_correction(img)
+        binary_img = self.generate_binary_image(undist_img)
+        warped_img = self.rectify_binary_image(binary_img)
+        laned_image, left_fitx, right_fitx, ploty = self.fit_polynomial(warped_img, self.xm_per_pix, self.ym_per_pix)
+        laned_mapped = self.map_to_real_world(laned_image)
+
+        result = cv2.addWeighted(img, 1, laned_mapped, 0.6, 0, dtype=cv2.CV_8U)
+
+        return result
 
     
 def run_pipeline(lane_finder, img):
@@ -281,15 +291,15 @@ def run_pipeline(lane_finder, img):
     f.tight_layout()
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     result = cv2.addWeighted(img, 1, laned_mapped, 0.6, 0, dtype=cv2.CV_8U)
-    ax1.imshow(laned_mapped)
-    ax2.imshow(img)
-    ax3.imshow(result)
-    ax4.imshow(laned_image)
-    ax4.plot(left_fitx, ploty, color='yellow')
-    ax4.plot(right_fitx, ploty, color='yellow')
-    ax4.set_title(curv_info, fontsize=15, loc='right')
-    plt.show()
-    return
+    # ax1.imshow(laned_mapped)
+    # ax2.imshow(img)
+    # ax3.imshow(result)
+    # ax4.imshow(laned_image)
+    # ax4.plot(left_fitx, ploty, color='yellow')
+    # ax4.plot(right_fitx, ploty, color='yellow')
+    # ax4.set_title(curv_info, fontsize=15, loc='right')
+    # plt.show()
+    return result
 
 def save_test_imgs():
     # Opens the Video file
@@ -305,13 +315,27 @@ def save_test_imgs():
     cap.release()
     cv2.destroyAllWindows()
 
+def process_video(filename):
+    lane_finder = LaneFinder()
+    white_output = './video_output/'+filename
+    ## To speed up the testing process you may want to try your pipeline on a shorter subclip of the video
+    ## To do so add .subclip(start_second,end_second) to the end of the line below
+    ## Where start_second and end_second are integer values representing the start and end of the subclip
+    ## You may also uncomment the following line for a subclip of the first 5 seconds
+    ##clip1 = VideoFileClip("test_videos/solidWhiteRight.mp4").subclip(0,5)
+    clip1 = VideoFileClip(filename).subclip(0,50)
+    white_clip = clip1.fl_image(lane_finder.pipeline) #NOTE: this function expects color images!!
+    white_clip.write_videofile(white_output, audio=False)
+
 if __name__ == '__main__':
     print("Executing: Lane Line Finder.")
     
-    lane_finder = LaneFinder()
-
-    testimg = cv2.imread('./test_images/project_video/0.jpg')
-    run_pipeline(lane_finder, testimg)
+    process_video('project_video.mp4')
+    #testimg = cv2.imread('./test_images/project_video/0.jpg')
+    #result = lane_finder.pipeline(testimg)
+    #plt.imshow(result)
+    #plt.show()
+    # run_pipeline(lane_finder, testimg)
     # testimg = cv2.imread('./test_images/project_video/10.jpg')
     # run_pipeline(lane_finder, testimg)
     # testimg = cv2.imread('./test_images/project_video/20.jpg')
