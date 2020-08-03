@@ -19,13 +19,15 @@ The goals / steps of this project are the following:
 
 [//]: # (Image References)
 
-[image1]: ./examples/undistort_output.png "Undistorted"
-[image2]: ./test_images/test1.jpg "Road Transformed"
-[image3]: ./examples/binary_combo_example.jpg "Binary Example"
-[image4]: ./examples/warped_straight_lines.jpg "Warp Example"
-[image5]: ./examples/color_fit_lines.jpg "Fit Visual"
-[image6]: ./examples/example_output.jpg "Output"
-[video1]: ./project_video.mp4 "Video"
+[image1]: ./output_images/01-undistorted_image.png "Undistorted"
+[image2]: ./output_images/02-binary_image.png "Binary"
+[image3]: ./output_images/03-wrapped_image.png "Warp"
+[image4]: ./output_images/04-first_polynomial.png "First Poly"
+[image5]: ./output_images/05-search_with_polynomial.png "Poly"
+[image6]: ./output_images/06-curvature.png "Curvature"
+[image7]: ./output_images/07-curvature_in_meter.png "Curvature Meter"
+[image8]: ./output_images/08-map_real_workd.png "Map"
+[video1]: ./video_output/project_video.mp4 "Video"
 
 ## [Rubric](https://review.udacity.com/#!/rubrics/571/view) Points
 
@@ -38,6 +40,8 @@ The goals / steps of this project are the following:
 #### 1. Provide a Writeup / README that includes all the rubric points and how you addressed each one.  You can submit your writeup as markdown or pdf.  [Here](https://github.com/udacity/CarND-Advanced-Lane-Lines/blob/master/writeup_template.md) is a template writeup for this project you can use as a guide and a starting point.  
 
 You're reading it!
+
+All my implemations are located in `lane_finder.py`
 
 ### Camera Calibration
 
@@ -53,20 +57,29 @@ I then used the output `objpoints` and `imgpoints` to compute the camera calibra
 
 ### Pipeline (single images)
 
-#### 1. Provide an example of a distortion-corrected image.
+`LaneFinder().pipeline()`
+
+#### 1. Undistort the original image
+
+`LaneFinder().distortion_correction()`
 
 To demonstrate this step, I will describe how I apply the distortion correction to one of the test images like this one:
 ![alt text][image2]
 
-#### 2. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
+#### 2. Generate a binary image
 
-I used a combination of color and gradient thresholds to generate a binary image (thresholding steps at lines # through # in `another_file.py`).  Here's an example of my output for this step.  (note: this is not actually from one of the test images)
+Combined color gradients and magnitude threshholds. Got a binary image like this:
 
-![alt text][image3]
+![alt text][image2]
 
-#### 3. Describe how (and identify where in your code) you performed a perspective transform and provide an example of a transformed image.
+After running the project_video.mp4, I found that the lane finder is not working well when light is changing. To fix this, I added another thresholds: HLS - S channel. 
+As a result the lane finder is able to find the lane when light is changing.
 
-The code for my perspective transform includes a function called `warper()`, which appears in lines 1 through 8 in the file `example.py` (output_images/examples/example.py) (or, for example, in the 3rd code cell of the IPython notebook).  The `warper()` function takes as inputs an image (`img`), as well as source (`src`) and destination (`dst`) points.  I chose the hardcode the source and destination points in the following manner:
+#### 3. Apply birds-eye view
+
+`LaneFinder().rectify_binary_image()`
+
+The function takes as inputs an image (`img`), as well as source (`src`) and destination (`dst`) points.  I chose the hardcode the source and destination points in the following manner:
 
 ```python
 src = np.float32(
@@ -92,31 +105,56 @@ This resulted in the following source and destination points:
 
 I verified that my perspective transform was working as expected by drawing the `src` and `dst` points onto a test image and its warped counterpart to verify that the lines appear parallel in the warped image.
 
+![alt text][image3]
+
+#### 4. Fit the polynomial
+
+`LaneFinder().fit_polynomial()`
+
+Use sliding windows to find the first polynomial:
+
 ![alt text][image4]
 
-#### 4. Describe how (and identify where in your code) you identified lane-line pixels and fit their positions with a polynomial?
-
-Then I did some other stuff and fit my lane lines with a 2nd order polynomial kinda like this:
+The lane will not change rapidly, so we can assume the polynomials are similar between frames. After having the first polynomial, the function can search the current polynomial based on the existing one.
 
 ![alt text][image5]
 
-#### 5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
+#### 5. Calculate the curvature
 
-I did this in lines # through # in my code in `my_other_file.py`
+`LaneFinder().calculate_curvature()`
 
-#### 6. Provide an example image of your result plotted back down onto the road such that the lane area is identified clearly.
-
-I implemented this step in lines # through # in my code in `yet_another_file.py` in the function `map_lane()`.  Here is an example of my result on a test image:
+Calculate the curvature based on the line which found by fit_polynomial().
 
 ![alt text][image6]
+
+However, this number is based on pixels. It needs to be mapped to meters.
+Here I set the mapping factor as:
+
+```
+self.ym_per_pix = 30/720 
+self.xm_per_pix = 3.7/700
+```
+
+Get a reasonable curvature after mapping. This value can be used to check lines' sanity.
+
+![alt text][image7]
+
+
+#### 6. Map the output to real world
+
+`LaneFinder().map_to_real_world()`
+
+Use Minv to map the result back to original image's transform. Then use cv2.addWeight() to overlay the result to the image:
+
+![alt text][image8]
 
 ---
 
 ### Pipeline (video)
 
-#### 1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
+#### 1. Link to your final video output.  
 
-Here's a [link to my video result](./project_video.mp4)
+Here's a [link to my video result](./video_output/project_video.mp4)
 
 ---
 
@@ -124,4 +162,5 @@ Here's a [link to my video result](./project_video.mp4)
 
 #### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
+The LaneFinder worked pretty stable in the project_video.mp4. But I can observe that the lane position is having issue in challenges video. 
+Applying offset check will help detection in challeng_video. And applying sanity checks & averaging should help the harder_challenge_video. I didn't got time to implement them this time. Will look into it later.
